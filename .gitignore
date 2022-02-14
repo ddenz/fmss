@@ -1,0 +1,49 @@
+# Compiled source #
+###################
+*.pyc
+*.o
+*.so
+*.class
+*.exe
+*.com
+
+# Packages #
+############
+*.7z
+*.dmg
+*.gz
+*.iso
+*.jar
+*.rar
+*.tar
+*.zip
+
+# Logs and databases #
+######################
+*.log
+*.sql
+*.sqlite
+
+# Jupyter notebooks #
+#####################
+*ipynb
+
+# OS generated files #
+######################
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Misc #
+########
+__pycache__/
+.idea/
+data/
+results/
+*.htm
+*.html
+*.*~
