@@ -38,12 +38,20 @@
 ehthumbs.db
 Thumbs.db
 
-# Misc #
-########
+# Folders #
+###########
 __pycache__/
 .idea/
 data/
 results/
+resources/
+
+# Code #
+########
+bert*.py
+
+# Misc #
+########
 *.htm
 *.html
 *.*~
