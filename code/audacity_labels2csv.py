@@ -1,9 +1,6 @@
 import argparse
-import docx
 import os
 import pandas as pd
-import re
-import sys
 
 from glob import glob
 
