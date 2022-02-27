@@ -10,7 +10,6 @@ from exp_data_loader import *
 from pathlib import Path
 from text_exploration import do_preprocessing, preprocess_text
 from gensim.models.keyedvectors import KeyedVectors
-from sklearn.feature_extraction.text import TfidfVectorizer
 
 # en_core_web_sm or en_core_web_trf
 nlp = spacy.load('en_core_web_sm')
