@@ -45,6 +45,7 @@ __pycache__/
 data/
 results/
 resources/
+*.ipynb_checkpoints/
 
 # Code #
 ########
@@ -55,3 +56,4 @@ bert*.py
 *.htm
 *.html
 *.*~
+
