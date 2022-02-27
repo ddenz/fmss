@@ -261,10 +261,10 @@ if __name__ == '__main__':
     """ prepare data
     dl = DataLoader('data/ERisk_coded_data_02Sep21.xlsx', 'data/fmss_text.csv', 'data/output_base_line/type-avec2013-seg-3600-hop-3600-avg', 'P')
 
-    df_data = dl.merge_transcripts_and_targets(merge_speakers=True)
+    df_data = dl.merge_transcripts_and_targets(merge_on=True)
     df_data = do_preprocessing(df_data, pout='data/fmss_text_pp_targets_P_merged.csv')
 
-    df_data = dl.merge_transcripts_and_targets(merge_speakers=False)
+    df_data = dl.merge_transcripts_and_targets(merge_on=False)
     df_data = do_preprocessing(df_data, pout='data/fmss_text_pp_targets_P_unmerged.csv')
     end prepare data"""
 

@@ -11,18 +11,22 @@ def segment(pin):
     :param pin: path of transcript text file
     :return: Pandas data frame containing all segments for the input transcript
     """
-    filename = '_'.join(os.path.basename(pin).split('_')[0:2]) + '.csv'
+    filename = os.path.basename(pin).split('-')[0]
     records = []
     lines = open(pin, 'r').read().split('\n')
     for i, line in enumerate(lines):
         if len(line) < 1:
             continue
-        print(line)
         start, end, text = line.split('\t')
         speaker, text = text.split(':')
+        twin = 3 # both
+        if 't1' in speaker:
+            twin = 1
+        elif 't2' in speaker:
+            twin = 2
         # print('{}|{}|{}|{}|{}'.format(filename, speaker, i, start, end, text))
-        records.append([filename, i, speaker, start, end, text])
-    return pd.DataFrame(records, columns=['FILENAME', 'TURN', 'SPEAKER', 'START', 'END', 'TEXT'])
+        records.append([filename, twin, i, speaker, start, end, text])
+    return pd.DataFrame(records, columns=['FILENAME', 'atwinid', 'TURN', 'SPEAKER', 'START', 'END', 'TEXT'])
 
 
 def process(pin):

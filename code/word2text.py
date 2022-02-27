@@ -55,8 +55,8 @@ def process(pin):
     df_data = pd.DataFrame()
     if os.path.isdir(pin):
         files = glob(pin + '/A*.doc*')
-        for pin in files:
-            pout = word2txt(pin)
+        for f in files:
+            pout = word2txt(f)
             df_data = df_data.append(segment(pout))
         df_data.reset_index(drop=True, inplace=True)
     elif os.path.isfile(pin):

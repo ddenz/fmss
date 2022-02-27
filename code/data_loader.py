@@ -192,8 +192,8 @@ class DataLoader(object):
         df_merged = self.merge_transcripts_and_targets(merge_speakers=True)
         df_acc = self.aggregate_acoustic_features()
         df_all = self.merge_all_features(df_acc, df_merged, pout)
-        # add categorical variables here
-        _ = self.to_categorical(df_all, 'warme5', bins=[0, 2.999, 3.999, 5], labels=['low', 'moderate', 'high'])
+        # add categorical variables here - NB using 0 as lower bound converts to NaN so using -0.000001
+        _ = self.to_categorical(df_all, 'warme5', bins=[-0.000001, 2.999, 3.999, 5], labels=['low', 'moderate', 'high'])
         return df_all
 
     def get_acoustic_feature_names(self):

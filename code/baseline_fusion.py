@@ -26,6 +26,7 @@ class BasePipeline(object):
         self.estimator_name = estimator_name
         self.acoustic_cols = acoustic_cols
         self.text_cols = text_cols
+        self.task = None
         self.metrics = {}
 
     def init_estimator(self):
