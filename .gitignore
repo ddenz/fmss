@@ -50,6 +50,7 @@ resources/
 # Code #
 ########
 bert*.py
+transformer_fusion.py
 
 # Misc #
 ########
