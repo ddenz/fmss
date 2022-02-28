@@ -73,7 +73,7 @@ def create_unknown_embedding(model):
     return average_vec
 
 
-def embed_text(model, text, unknown_vec):
+def embed_text(model, text, unknown_vec=None):
     """
     Covert text to embeddings
     :param model: embedding model
@@ -85,7 +85,7 @@ def embed_text(model, text, unknown_vec):
     for word in text:
         if word in model:
             vectors.append(model.get_vector(word))
-        else:
+        elif unknown_vec is not None:
             vectors.append(unknown_vec)
     return vectors
 
@@ -111,7 +111,7 @@ def embed_sentences(model, sents, unknown_vec, max_len=None, aggregation=None):
     return vectors
 
 
-def batch_embed_tokens(model_path, df, output_dir_path, speakers, max_len=None, average_all=False):
+def batch_embed_tokens(model_path, df, output_dir_path, speakers, max_len=None, create_unknown=None, average_all=False):
     """
 
     :param model_path:
@@ -125,12 +125,15 @@ def batch_embed_tokens(model_path, df, output_dir_path, speakers, max_len=None, 
         embs = KeyedVectors.load_word2vec_format(model_path)
     except UnicodeDecodeError:
         embs = KeyedVectors.load_word2vec_format(model_path, binary=True)
-    unk_vec = create_unknown_embedding(embs)
     pad_vec = np.zeros((len(embs), embs[0].shape[0]))
     model_name = Path(model_path).parent.name
     pout_dir = os.path.join(output_dir_path, model_name + '_tokens_' + speakers)
     if average_all:
         pout_dir += '_mean'
+    unk_vec = None
+    if create_unknown:
+        unk_vec = create_unknown_embedding(embs)
+        pout_dir += '_unk'
     os.makedirs(pout_dir, exist_ok=True)
 
     for i, row in df.iterrows():
@@ -151,7 +154,7 @@ def batch_embed_tokens(model_path, df, output_dir_path, speakers, max_len=None, 
         print('-- wrote file:', pout)
 
 
-def batch_embed_sentences_with_padding(model_path, df, max_num_sent, max_sent_len, output_dir_path, speakers):
+def batch_embed_sentences_with_padding(model_path, df, max_num_sent, max_sent_len, output_dir_path, speakers, create_unknown=None):
     """
     Embed tokens in all sentences as-is and adjust for sentence length and number of sentences if required
     :param model_path:
@@ -166,10 +169,15 @@ def batch_embed_sentences_with_padding(model_path, df, max_num_sent, max_sent_le
         embs = KeyedVectors.load_word2vec_format(model_path)
     except UnicodeDecodeError:
         embs = KeyedVectors.load_word2vec_format(model_path, binary=True)
-    unk_vec = create_unknown_embedding(embs)
     pad_vec = np.zeros((len(embs), embs[0].shape[0]))
     model_name = Path(model_path).parent.name
     pout_dir = os.path.join(output_dir_path, model_name + '_sents_full_' + str(max_num_sent) + '_' + str(max_sent_len) + '_' + speakers)
+
+    unk_vec = None
+    if create_unknown:
+        unk_vec = create_unknown_embedding(embs)
+        pout_dir += '_unk'
+
     os.makedirs(pout_dir, exist_ok=True)
 
     for i, row in df.iterrows():
@@ -187,7 +195,7 @@ def batch_embed_sentences_with_padding(model_path, df, max_num_sent, max_sent_le
         print('-- wrote sentence embeddings with padding to', pout)
 
 
-def batch_embed_sentences(model_path, df, output_dir_path, speakers, average_all=False):
+def batch_embed_sentences(model_path, df, output_dir_path, speakers, create_unknown=None, average_all=False):
     """
     Embed tokens in all sentences and average for sentence embeddings
     :param model_path:
@@ -200,11 +208,15 @@ def batch_embed_sentences(model_path, df, output_dir_path, speakers, average_all
         embs = KeyedVectors.load_word2vec_format(model_path)
     except UnicodeDecodeError:
         embs = KeyedVectors.load_word2vec_format(model_path, binary=True)
-    unk_vec = create_unknown_embedding(embs)
+
     model_name = Path(model_path).parent.name
     pout_dir = os.path.join(output_dir_path, model_name + '_sents_mean_' + speakers)
     if average_all:
         pout_dir += '_mean'
+    unk_vec = None
+    if create_unknown:
+        unk_vec = create_unknown_embedding(embs)
+        pout_dir += '_unk'
     os.makedirs(pout_dir, exist_ok=True)
 
     for i, row in df.iterrows():
@@ -230,6 +242,8 @@ if __name__ == '__main__':
                         help='path to turn-based text transcripts per audio file in CSV format', required=True)
     parser.add_argument('-a', '--average_all', action='store_true',
                         help='take mean of all rows to produce final output (same number of columns)', required=False)
+    parser.add_argument('-g', '--generate_unknown', action='store_true',
+                        help='generate a word vector for unknown words (mean of all embeddings in model)', required=False)
     parser.add_argument('-u', '--unit', type=str, nargs=1, help='linguistic units to use (token/word or sentence)',
                         choices=['token', 'word', 'sentence'], required=True)
     parser.add_argument('-o', '--output_directory', type=str, nargs=1, help='directory to output embedded transcripts '
@@ -245,8 +259,8 @@ if __name__ == '__main__':
     df_data, max_len, max_num_sent = prepare_data(transcript_file, unit=unit)
 
     if unit in ['token', 'word']:
-        batch_embed_tokens(model_path, df_data, pout, speakers, average_all=args.average_all)
+        batch_embed_tokens(model_path, df_data, pout, speakers, create_unknown=args.generate_unknown, average_all=args.average_all)
     elif unit == 'sentence':
-        batch_embed_sentences(model_path, df_data, pout, speakers, average_all=args.average_all)
+        batch_embed_sentences(model_path, df_data, pout, speakers, create_unknown=args.generate_unknown, average_all=args.average_all)
     else:
         raise ValueError('-- invalid unit: ' + unit + ". Use 'token', 'word' or 'sentence'.")
