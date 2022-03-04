@@ -2,7 +2,6 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from bert_transformer import *
 from exp_data_loader import DataLoader
 
 from pprint import pprint
@@ -26,18 +25,34 @@ SEED = 42
 
 
 class BasePipeline(object):
-    def __init__(self, data: pd.DataFrame, target_names: list, estimator_name: str, acoustic_cols:list, text_cols:list):
+    def __init__(self, data: pd.DataFrame, target_names: list, estimator_name: str, embed_cols:list, acoustic_cols:list, text_cols:list):
         self.data = data
         self.target_names = target_names
         self.estimator_name = estimator_name
         self.vectorizer_params = None
         self.acoustic_cols = acoustic_cols
+        self.embedding_cols = embed_cols
         self.text_cols = text_cols
         self.task = None
         self.metrics = {}
 
     def init_estimator(self):
         pass
+
+    def select_embedding_feature_item(self):
+        """
+        Choose appropriate embedding features - on-the-fly or loaded from disk
+        :return:
+        """
+        if self.embedding_cols is not None and self.embedding_cols != []:
+            print('-- using precalculated embeddings')
+            return ('embedding_features', Pipeline([('selector', ItemSelector(key=self.embedding_cols))]))
+        else:
+            print('-- using on-the-fly embeddings')
+            return ('embedding_features', Pipeline([
+                ('selector', ItemSelector(key='TEXT')),
+                ('embedding_vectorizer', EmbeddingTransformer(embedding_model, aggregation='average'))
+            ]))
 
     def init_pipeline(self, tfidf=True, embedding_model=None):
         if self.acoustic_cols is not None and self.acoustic_cols != []:
@@ -59,10 +74,7 @@ class BasePipeline(object):
                             ('selector', ItemSelector(key='TEXT')),
                             ('vectorizer', vectorizer)
                         ])),
-                        ('embedding_features', Pipeline([
-                            ('selector', ItemSelector(key='TEXT')),
-                            ('embedding_vectorizer', EmbeddingTransformer(embedding_model, aggregation='average'))
-                        ]))
+                        self.select_embedding_feature_item()
                     ])
                 elif tfidf:
                     if self.vectorizer_params is not None:
@@ -87,10 +99,7 @@ class BasePipeline(object):
                             ('selector', ItemSelector(key=self.acoustic_cols)),
                             ('scaler', StandardScaler())
                         ])),
-                        ('embedding_features', Pipeline([
-                            ('selector', ItemSelector(key='TEXT')),
-                            ('embedding_vectorizer', EmbeddingTransformer(embedding_model, aggregation='average'))
-                        ]))
+                        self.select_embedding_feature_item()
                     ])
             else:
                 print('-- using acoustic features only', sorted(self.acoustic_cols))
@@ -113,10 +122,7 @@ class BasePipeline(object):
                         ('selector', ItemSelector(key='TEXT')),
                         ('vectorizer', vectorizer)
                     ])),
-                    ('embedding_features', Pipeline([
-                        ('selector', ItemSelector(key='TEXT')),
-                        ('embedding_vectorizer', EmbeddingTransformer(embedding_model, aggregation='average'))
-                    ]))
+                    self.select_embedding_feature_item()
                 ])
             elif tfidf:
                 print('-- using TFIDF only', embedding_model)
@@ -133,10 +139,7 @@ class BasePipeline(object):
             else:
                 print('-- using', embedding_model, 'only')
                 feature_union = FeatureUnion([
-                    ('embedding_features', Pipeline([
-                        ('selector', ItemSelector(key='TEXT')),
-                        ('embedding_vectorizer', EmbeddingTransformer(embedding_model, aggregation='average'))
-                    ]))
+                    self.select_embedding_feature_item()
                 ])
         estimator = self.init_estimator()
         pipeline = Pipeline([
@@ -160,7 +163,7 @@ class BasePipeline(object):
         pass
 
     def get_Xy(self, target: str):
-        feature_names = self.acoustic_cols + self.text_cols
+        feature_names = self.acoustic_cols + self.embedding_cols + self.text_cols
         X = self.data[feature_names]
         y = self.data[target]
         return X, y
@@ -225,8 +228,8 @@ class BasePipeline(object):
 
 
 class RegressionPipeline(BasePipeline):
-    def __init__(self, data: pd.DataFrame, target_names: list, estimator_name: str, acoustic_cols: list, text_cols: list):
-        super().__init__(data, target_names, estimator_name, acoustic_cols, text_cols)
+    def __init__(self, data: pd.DataFrame, target_names: list, estimator_name: str, embed_cols:list, acoustic_cols: list, text_cols: list):
+        super().__init__(data, target_names, estimator_name, embed_cols, acoustic_cols, text_cols)
         self.task = 'regression'
 
     def init_estimator(self):
@@ -252,8 +255,8 @@ class RegressionPipeline(BasePipeline):
 
 
 class ClassificationPipeline(BasePipeline):
-    def __init__(self, data: pd.DataFrame, target_names: list, estimator_name: str, acoustic_cols: list, text_cols: list):
-        super().__init__(data, target_names, estimator_name, acoustic_cols, text_cols)
+    def __init__(self, data: pd.DataFrame, target_names: list, estimator_name: str, embed_cols:list, acoustic_cols: list, text_cols: list):
+        super().__init__(data, target_names, estimator_name, embed_cols, acoustic_cols, text_cols)
         self.task = 'classification'
 
     def init_estimator(self):
@@ -292,6 +295,8 @@ if __name__ == '__main__':
                         help='path to Excel spreadsheet containing ERisk coded data', required=True)
     parser.add_argument('-a', '--acoustic_feature_dir', type=str, nargs=1,
                         help='path to directory containing baseline acoustic features', required=True)
+    parser.add_argument('-w', '--word_embedding_dir', type=str, nargs=1,
+                        help='path to directory containing word embedding features', required=False)
     parser.add_argument('-o', '--output_file', type=str, nargs=1,
                         help='path of CSV file to save all features to', required=False)
     parser.add_argument('-l', '--labels', type=str, nargs='+', help='names of the target label(s) to predict', required=True)
@@ -301,7 +306,7 @@ if __name__ == '__main__':
                         choices=['lr', 'mlp', 'knn', 'rf', 'svm', 'gb'], required=True)
     parser.add_argument('-u', '--use_features', type=str, nargs='+', help='types of features to use. Choose from '
                                                                           '"acoustic" and/or one of "tfidf", "glove", '
-                                                                          '"word2vec", or "bert"', required=True)
+                                                                          'or "word2vec"', required=True)
     #parser.add_argument('-g', '--grid_search', action='store_true', help='perform hyperparameter tuning using grid search', required=False)
 
     args = parser.parse_args()
@@ -309,6 +314,9 @@ if __name__ == '__main__':
     erisk_codes_file = args.erisk_codes_file[0]
     transcript_file = args.transcript_file[0]
     acoustic_features_dir = args.acoustic_feature_dir[0]
+    word_embedding_dir = None
+    if args.word_embedding_dir is not None:
+        word_embedding_dir = args.word_embedding_dir[0]
     output_file = None
     #grid_search = args.grid_search
     if args.output_file is not None:
@@ -328,11 +336,12 @@ if __name__ == '__main__':
     else:
         raise ValueError("-- invalid task:" + task + ". Choose 'classification' or 'regression'")
 
-    dl = DataLoader(transcript_file, acoustic_features_dir, erisk_codes_file, load_utterances_with_both_twins=True, load_both_speakers=True, merge_on='speaker')
+    dl = DataLoader(transcript_file, acoustic_features_dir, erisk_codes_file, word_embedding_dir, load_utterances_with_both_twins=True, load_both_speakers=True, merge_on='speaker')
     df_data = dl.process()
 
     text_features = []
     acoustic_features = []
+    embed_features = []
     tfidf = 'tfidf' in args.use_features
     embedding_model = None
 
@@ -342,18 +351,21 @@ if __name__ == '__main__':
         acoustic_features = dl.get_acoustic_feature_names()
     if 'glove' in args.use_features:
         embedding_model = 'glove'
+        embed_features = dl.get_embed_feature_names()
     elif 'word2vec' in args.use_features:
         embedding_model = 'word2vec'
+        embed_features = dl.get_embed_feature_names()
     elif 'fasttext' in args.use_features:
         embedding_model = 'fasttext'
+        embed_features = dl.get_embed_feature_names()
     #elif 'bert' in args.use_features:
     #    # TODO implement this
     #    embedding_model = 'bert'
 
     if task == 'classification':
-        rp = ClassificationPipeline(df_data, target_labels, model, acoustic_features, text_features)
+        rp = ClassificationPipeline(df_data, target_labels, model, embed_features, acoustic_features, text_features)
     elif task == 'regression':
-        rp = RegressionPipeline(df_data, target_labels, model, acoustic_features, text_features)
+        rp = RegressionPipeline(df_data, target_labels, model, embed_features, acoustic_features, text_features)
     else:
         raise ValueError('-- incorrect task', task)
 

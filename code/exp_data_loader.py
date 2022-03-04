@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 
 import pandas as pd
@@ -19,17 +20,25 @@ class DataLoader(object):
     """
 
     """
-    def __init__(self, pin_transcripts, pin_audio, pin_targets, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker'):
+    def __init__(self, pin_transcripts, pin_audio, pin_targets, pin_embed, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker'):
         self.pin_transcripts = pin_transcripts
         self.pin_audio = pin_audio
         self.pin_targets = pin_targets
+        self.pin_embed = pin_embed
         self.load_utterances_with_both_twins = load_utterances_with_both_twins
         self.load_both_speakers = load_both_speakers
         self.merge_on = merge_on
         self.acoustic_feature_names = []
+        self.embed_feature_names = []
+
+    def set_pin_embed(self, pin):
+        self.pin_embed = pin
 
     def get_acoustic_feature_names(self):
         return self.acoustic_feature_names
+
+    def get_embed_feature_names(self):
+        return self.embed_feature_names
 
     def to_categorical(self, df, feature, bins, labels):
         """
@@ -189,6 +198,33 @@ class DataLoader(object):
 
         return df_global
 
+    def load_word_embedding_features(self):
+        files_t1 = glob(self.pin_embed + '/A*twin-1*.csv')
+        files_t2 = glob(self.pin_embed + '/A*twin-2*.csv')
+
+        df_global = pd.DataFrame()
+
+        # elder twin
+        for file in files_t1:
+            df_tmp = pd.read_csv(file)
+            df_tmp[TWINID_HDR] = 1
+            df_tmp[FILE_HDR] = os.path.basename(re.sub('_twin.+', '', file))
+            df_global = df_global.append(df_tmp)
+
+        # younger twin
+        for file in files_t2:
+            df_tmp = pd.read_csv(file)
+            df_tmp[TWINID_HDR] = 2
+            df_tmp[FILE_HDR] = os.path.basename(re.sub('_twin.+', '', file))
+            df_global = df_global.append(df_tmp)
+
+        self.embed_feature_names = [c for c in df_global.columns if 'dim_' in c]
+        df_global.fillna(value=0, inplace=True)
+        df_global.sort_values(by=[FILE_HDR, TWINID_HDR], inplace=True)
+        df_global.reset_index(inplace=True, drop=True)
+
+        return df_global
+
     def merge_transcripts_and_targets(self):
         """
 
@@ -210,10 +246,15 @@ class DataLoader(object):
         df_audio = self.load_audio_features()
         df_all = df_merged.merge(df_audio, on=[FILE_HDR, TWINID_HDR])
 
+        if self.pin_embed is not None:
+            df_embed = self.load_word_embedding_features()
+            df_all = df_all.merge(df_embed, on=[FILE_HDR, TWINID_HDR])
+
         # remove features that have identical values across the data set
         cols_to_drop = df_all.columns[df_all.nunique() <= 1]
         df_all.drop(cols_to_drop, axis=1, inplace=True)
         # sort this to ensure reproducibility as some models are affected by column/feature order
+        self.acoustic_feature_names = set(self.acoustic_feature_names) - set(self.embed_feature_names)
         self.acoustic_feature_names = sorted(list(set(self.acoustic_feature_names) - set(cols_to_drop)))
 
         # add categorical variables here - NB using 0 as lower bound converts to NaN so using -0.000001
@@ -240,6 +281,8 @@ if __name__ == '__main__':
                         help='path to turn-based text transcripts per audio file in CSV format', required=True)
     parser.add_argument('-e', '--erisk_codes_file', type=str, nargs=1,
                         help='path to Excel spreadsheet containing ERisk coded data', required=False)
+    parser.add_argument('-w', '--word_embed_dir', type=str, nargs=1,
+                        help='path to directory containing word embedding features', required=False)
     parser.add_argument('-a', '--acoustic_feature_dir', type=str, nargs=1,
                         help='path to directory containing baseline acoustic features', required=False)
     parser.add_argument('-o', '--output_file', type=str, nargs=1,
@@ -254,10 +297,13 @@ if __name__ == '__main__':
     acoustic_features_dir = None
     if args.acoustic_feature_dir is not None:
         acoustic_features_dir = args.acoustic_feature_dir[0]
+    word_embed_dir = None
+    if args.word_embed_dir is not None:
+        word_embed_dir = args.word_embed_dir[0]
     output_file = None
     if args.output_file is not None:
         output_file = args.output_file[0]
 
-    dl = DataLoader(transcript_file, acoustic_features_dir, erisk_codes_file, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
+    dl = DataLoader(transcript_file, acoustic_features_dir, erisk_codes_file, word_embed_dir, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
     df = dl.process(pout=output_file)
     print(df)

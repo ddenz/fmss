@@ -28,30 +28,37 @@ for f in features_to_use:
     acoustic_features = []
     text_features = []
     embedding_model = None
+    word_embedding_dir = None
 
     for a in acoustic_features_dirs:
-        dl = DataLoader(transcript_file, a, erisk_codes_file, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
 
         if 'glove' in f:
             embedding_model = 'glove'
+            word_embedding_dir = '../../exp/nlp/text_features/glove-twitter-25_tokens_mum_mean/'
+        if 'fasttext' in f:
+            embedding_model = 'fasttext'
+            word_embedding_dir = '../../exp/nlp/text_features/fasttext-wiki-news-subwords-300_tokens_mum_mean/'
         if 'word2vec' in f:
             embedding_model = 'word2vec'
+            word_embedding_dir = '../../exp/nlp/text_features/word2vec-google-news-300_tokens_mum_mean/'
 
-        if 'tfidf' in f or 'glove' in f or 'word2vec' in f:
+        if 'tfidf' in f or 'glove' in f or 'fasttext' in f or 'word2vec' in f:
             text_features = ['TEXT']
 
+        dl = DataLoader(transcript_file, a, erisk_codes_file, word_embedding_dir, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
         df_data = dl.process()
         acoustic_features = dl.get_acoustic_feature_names()
+        embed_features = dl.get_embed_feature_names()
 
         ac = a.split('/')[-2]
 
         for r in models:
             if task == 'regression':
-                rp = RegressionPipeline(df_data, target_labels, r, acoustic_features, text_features)
+                rp = RegressionPipeline(df_data, target_labels, r, embed_features, acoustic_features, text_features)
             else:
                 X = df_data.drop(ALL_TARGETS, axis=1, errors='ignore')
                 y = df_data[target_labels]
-                rp = ClassificationPipeline(df_data, target_labels, r, acoustic_features, text_features)
+                rp = ClassificationPipeline(df_data, target_labels, r, embed_features, acoustic_features, text_features)
             res, preds = rp.process(tfidf=('tfidf' in f), embedding_model=embedding_model)
             for target_label in res:
                 scores = list(res[target_label].values())

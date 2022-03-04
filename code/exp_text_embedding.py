@@ -25,7 +25,7 @@ def prepare_data(transcript_path, unit='token'):
     mean number of sentences per interview (None if token/word is used as a unit)
     """
     print('Preparing data...')
-    dl = DataLoader(transcript_path, None, None, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
+    dl = DataLoader(transcript_path, None, None, None, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
     df = dl.load_transcripts()
 
     if unit in ['token', 'word']:
@@ -138,7 +138,7 @@ def batch_embed_tokens(model_path, df, output_dir_path, speakers, max_len=None, 
 
     for i, row in df.iterrows():
         filename = row[FILE_HDR]
-        twinid = str(row[TWINID_HDR])
+        twinid = str(row[TWINID_HDR] - 1) # subtract 1 as naming is 0 for elder twin and 1 for younger twin
         text = row['TEXT_PP'].split()
         if max_len is not None and len(text) > max_len:
             text = text[0:max_len]
@@ -149,6 +149,7 @@ def batch_embed_tokens(model_path, df, output_dir_path, speakers, max_len=None, 
         df_out = pd.DataFrame(emb_text)
         if average_all:
             df_out = pd.DataFrame(df_out.mean(axis=0)).T
+        df_out.columns = ['dim_' + str(c) for c in df_out.columns]
         df_out.insert(0, 'name', len(df_out) * [filename])
         df_out.to_csv(pout, index=False)
         print('-- wrote file:', pout)
@@ -182,7 +183,7 @@ def batch_embed_sentences_with_padding(model_path, df, max_num_sent, max_sent_le
 
     for i, row in df.iterrows():
         filename = row[FILE_HDR]
-        twinid = str(row[TWINID_HDR])
+        twinid = str(row[TWINID_HDR] - 1) # subtract 1 as naming is 0 for elder twin and 1 for younger twin
         sents = row['TEXT_PP_SENT']
         if len(sents) > max_num_sent:
             sents = sents[0:max_num_sent]
@@ -221,13 +222,14 @@ def batch_embed_sentences(model_path, df, output_dir_path, speakers, create_unkn
 
     for i, row in df.iterrows():
         filename = row[FILE_HDR]
-        twinid = str(row[TWINID_HDR])
+        twinid = str(row[TWINID_HDR] - 1) # subtract 1 as naming is 0 for elder twin and 1 for younger twin
         sents = [s for s in row['TEXT_PP_SENT'] if s != '']
         emb_sents = embed_sentences(embs, sents, unk_vec, max_len=None, aggregation='mean')
         pout = pout_dir + '/' + filename + '_twin-' + twinid + '.csv'
         df_out = pd.DataFrame(emb_sents)
         if average_all:
             df_out = pd.DataFrame(df_out.mean(axis=0)).T
+        df_out.columns = ['dim_' + str(c) for c in df_out.columns]
         df_out.insert(0, 'name', len(df_out) * [filename])
         df_out.to_csv(pout, index=False)
         print('-- wrote sentence embeddings without padding to', pout)
