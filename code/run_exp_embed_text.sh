@@ -4,6 +4,6 @@ do
 	do
 		echo "$EM $UNIT"
 		python exp_text_embedding.py -m "$EM" -s mum -t ../data/fmss_transcripts_labels_twinids.csv -u "$UNIT" -o ../data/text_features -a
-		python exp_text_embedding.py -m "$EM" -s mum -t ../data/fmss_transcripts_labels_twinids.csv -u "$UNIT" -o ../data/text_features -a -g
+		#python exp_text_embedding.py -m "$EM" -s mum -t ../data/fmss_transcripts_labels_twinids.csv -u "$UNIT" -o ../data/text_features -a -g
 	done
 done

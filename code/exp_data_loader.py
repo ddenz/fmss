@@ -199,8 +199,8 @@ class DataLoader(object):
         return df_global
 
     def load_word_embedding_features(self):
-        files_t1 = glob(self.pin_embed + '/A*twin-1*.csv')
-        files_t2 = glob(self.pin_embed + '/A*twin-2*.csv')
+        files_t1 = glob(self.pin_embed + '/A*twin-0*.csv')
+        files_t2 = glob(self.pin_embed + '/A*twin-1*.csv')
 
         df_global = pd.DataFrame()
 

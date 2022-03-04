@@ -21,7 +21,10 @@ from sklearn.preprocessing import StandardScaler
 
 from zeugma import EmbeddingTransformer, ItemSelector
 
-SEED = 42
+RANDOM_STATE = 0
+SEED = 110
+
+np.random.seed(SEED)
 
 
 class BasePipeline(object):
@@ -39,9 +42,9 @@ class BasePipeline(object):
     def init_estimator(self):
         pass
 
-    def select_embedding_feature_item(self):
+    def select_embedding_feature_source(self):
         """
-        Choose appropriate embedding features - on-the-fly or loaded from disk
+        Choose source of embedding features - on-the-fly or loaded from disk
         :return:
         """
         if self.embedding_cols is not None and self.embedding_cols != []:
@@ -74,7 +77,7 @@ class BasePipeline(object):
                             ('selector', ItemSelector(key='TEXT')),
                             ('vectorizer', vectorizer)
                         ])),
-                        self.select_embedding_feature_item()
+                        self.select_embedding_feature_source()
                     ])
                 elif tfidf:
                     if self.vectorizer_params is not None:
@@ -99,7 +102,7 @@ class BasePipeline(object):
                             ('selector', ItemSelector(key=self.acoustic_cols)),
                             ('scaler', StandardScaler())
                         ])),
-                        self.select_embedding_feature_item()
+                        self.select_embedding_feature_source()
                     ])
             else:
                 print('-- using acoustic features only', sorted(self.acoustic_cols))
@@ -122,10 +125,10 @@ class BasePipeline(object):
                         ('selector', ItemSelector(key='TEXT')),
                         ('vectorizer', vectorizer)
                     ])),
-                    self.select_embedding_feature_item()
+                    self.select_embedding_feature_source()
                 ])
             elif tfidf:
-                print('-- using TFIDF only', embedding_model)
+                print('-- using TFIDF only')
                 if self.vectorizer_params is not None:
                     vectorizer = TfidfVectorizer(**self.vectorizer_params)
                 else:
@@ -139,7 +142,7 @@ class BasePipeline(object):
             else:
                 print('-- using', embedding_model, 'only')
                 feature_union = FeatureUnion([
-                    self.select_embedding_feature_item()
+                    self.select_embedding_feature_source()
                 ])
         estimator = self.init_estimator()
         pipeline = Pipeline([
@@ -189,8 +192,8 @@ class BasePipeline(object):
         for target in self.target_names:
             print('-- doing grid search for', target)
             X, y = self.get_Xy(target)
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=SEED)
-            skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=SEED)
+            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=RANDOM_STATE)
+            skf = StratifiedKFold(n_splits=n_splits, shuffle=True, random_state=RANDOM_STATE)
             gs = GridSearchCV(pipeline, params, scoring='f1_weighted', cv=skf, n_jobs=-1)
             gs.fit(X_train, y_train)
             gs_dict[target] = gs.best_params_
@@ -210,7 +213,7 @@ class BasePipeline(object):
         for t in self.target_names:
             X, y = self.get_Xy(t)
             # running cv twice is inefficient, but cross_val_predict is not reliable for evaluating generalisability
-            skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=SEED)
+            skf = StratifiedKFold(n_splits=5, shuffle=True, random_state=RANDOM_STATE)
             cv_scores = cross_validate(pipeline, X, y, cv=skf, scoring=self.metrics, n_jobs=-1)
             preds = cross_val_predict(pipeline, X, y, cv=skf, n_jobs=-1)
             all_preds[t] = preds
@@ -237,15 +240,15 @@ class RegressionPipeline(BasePipeline):
         if self.estimator_name == 'lr':
             estimator = LinearRegression()
         elif self.estimator_name == 'mlp':
-            estimator = MLPRegressor(random_state=SEED, max_iter=500)
+            estimator = MLPRegressor(random_state=RANDOM_STATE, max_iter=500)
         elif self.estimator_name == 'knn':
             estimator = KNeighborsRegressor(3, n_jobs=-1)
         elif self.estimator_name == 'rf':
-            estimator = RandomForestRegressor(random_state=SEED, n_jobs=-1)
+            estimator = RandomForestRegressor(random_state=RANDOM_STATE, n_jobs=-1)
         elif self.estimator_name == 'gb':
-            estimator = GradientBoostingRegressor(random_state=SEED)
+            estimator = GradientBoostingRegressor(random_state=RANDOM_STATE)
         else:
-            estimator = LinearSVR(random_state=SEED, max_iter=3000)
+            estimator = LinearSVR(random_state=RANDOM_STATE, max_iter=3000)
         return estimator
 
     def set_metrics(self):
@@ -262,17 +265,17 @@ class ClassificationPipeline(BasePipeline):
     def init_estimator(self):
         print('-- classifier:', self.estimator_name)
         if self.estimator_name == 'lr':
-            estimator = LogisticRegression(random_state=SEED, max_iter=1000, n_jobs=-1)
+            estimator = LogisticRegression(random_state=RANDOM_STATE, max_iter=1000, n_jobs=-1)
         elif self.estimator_name == 'mlp':
-            estimator = MLPClassifier(random_state=SEED, max_iter=500)
+            estimator = MLPClassifier(random_state=RANDOM_STATE, max_iter=500)
         elif self.estimator_name == 'knn':
             estimator = KNeighborsClassifier(3, n_jobs=-1)
         elif self.estimator_name == 'rf':
-            estimator = RandomForestClassifier(random_state=SEED, n_jobs=-1)
+            estimator = RandomForestClassifier(random_state=RANDOM_STATE, n_jobs=-1)
         elif self.estimator_name == 'gb':
-            estimator = GradientBoostingClassifier(random_state=SEED)
+            estimator = GradientBoostingClassifier(random_state=RANDOM_STATE)
         else:
-            estimator = LinearSVC(random_state=SEED, max_iter=3000)
+            estimator = LinearSVC(random_state=RANDOM_STATE, max_iter=3000)
         return estimator
 
     def set_metrics(self, average='weighted'):
@@ -372,11 +375,10 @@ if __name__ == '__main__':
     if len(args.use_features) > 2:
         raise Exception('-- too many feature types specified. Choose at most 2, including only 1 text feature type.')
     if len([a for a in args.use_features if a != 'acoustic']) > 1:
-        raise Exception('-- too many text feature types specified. Choose 1 only from "tfidf", "glove", "word2vec", "bert".')
+        raise Exception('-- too many text feature types specified. Choose 1 only from "tfidf", "fasttext", "glove", "word2vec".')
 
     rp.print_target_distribution()
 
     df_results, preds = rp.process(tfidf=tfidf, embedding_model=embedding_model)
     print(df_results)
-    print(preds)
-    pd.DataFrame(preds).to_csv('../results/preds_exp.csv')
+    print(preds, len(preds))
