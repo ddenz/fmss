@@ -22,6 +22,7 @@ if task == 'regression':
 
 df_results = pd.DataFrame()
 output_file = '../data/fmss_exp_full_data_batch.csv'
+use_textpp = False
 
 for f in features_to_use:
     print('-- using features:', f)
@@ -44,9 +45,11 @@ for f in features_to_use:
 
         if 'tfidf' in f or 'glove' in f or 'fasttext' in f or 'word2vec' in f:
             text_features = ['TEXT']
+            if use_textpp:
+                text_features = ['TEXT_PP']
 
         dl = DataLoader(transcript_file, a, erisk_codes_file, word_embedding_dir, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
-        df_data = dl.process()
+        df_data = dl.process(preprocess_text=use_textpp)
         acoustic_features = dl.get_acoustic_feature_names()
         embed_features = dl.get_embed_feature_names()
 
@@ -77,4 +80,11 @@ df_results.columns = ['target', 'acoustic', 'used_features', 'classifier', 'accu
 if task == 'regression':
     df_results.columns = ['target', 'acoustic', 'used_features', 'regressor', 'mae', 'mse', 'rmse']
 
-df_results.to_csv('../results/exp_fusion_' + task + '_results_' + timestamp + '_acoustic.csv')
+pout = '../results/exp_fusion_' + task + '_results_' + timestamp + '_acoustic'
+if use_textpp:
+    pout += '_textpp'
+else:
+    pout += '_notextpp'
+pout += '.csv'
+df_results.to_csv(pout)
+print('-- wrote results to:', pout)

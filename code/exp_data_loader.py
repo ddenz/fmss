@@ -1,11 +1,11 @@
 import argparse
 import os
-import sys
-
 import pandas as pd
 import re
+import sys
 
 from glob import glob
+from text_exploration import *
 
 FILE_HDR = 'FILENAME'
 SPEAKER_HDR = 'SPEAKER'
@@ -234,7 +234,7 @@ class DataLoader(object):
         df_transcripts = self.load_transcripts()
         return df_transcripts.merge(df_targets, on=[FILE_HDR, TWINID_HDR])
 
-    def process(self, pout=None):
+    def process(self, preprocess_text=False, pout=None):
         """
 
         :return:
@@ -261,6 +261,9 @@ class DataLoader(object):
         _ = self.to_categorical(df_all, 'warme5', bins=[-0.000001, 3.999, 4.999, 5], labels=['low', 'moderate', 'high'])
         #_ = self.to_categorical(df_all, 'warme5', bins=[-0.000001, 0.999, 1.999, 2.999, 3.999, 5], labels=['1', '2', '3', '4', '5'])
 
+        if preprocess_text:
+            df_all = do_preprocessing(df_all)
+
         df_all.sort_index(axis=1, inplace=True)
         df_all.reset_index(drop=True, inplace=True)
 
@@ -285,6 +288,8 @@ if __name__ == '__main__':
                         help='path to directory containing word embedding features', required=False)
     parser.add_argument('-a', '--acoustic_feature_dir', type=str, nargs=1,
                         help='path to directory containing baseline acoustic features', required=False)
+    parser.add_argument('-p', '--preprocess_text', action='store_true',
+                        help='do text preprocessing (tokenise, remove punctuation and stopwords', required=False)
     parser.add_argument('-o', '--output_file', type=str, nargs=1,
                         help='path of CSV file to save all features to', required=False)
 
@@ -305,5 +310,5 @@ if __name__ == '__main__':
         output_file = args.output_file[0]
 
     dl = DataLoader(transcript_file, acoustic_features_dir, erisk_codes_file, word_embed_dir, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
-    df = dl.process(pout=output_file)
+    df = dl.process(preprocess_text=args.preprocess_text, pout=output_file)
     print(df)

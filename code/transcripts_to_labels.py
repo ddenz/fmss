@@ -30,8 +30,8 @@ def process(pin):
             m = re.search('^([IP]) +\[([^ ]+) - ([^\]]+)]@(.+)', line)
             if m is not None:
                 speaker = 'int' if m.group(1) == 'I' else 'mum'
-                start = get_sec(m.group(2))
-                end = get_sec(m.group(3))
+                start = format(float(get_sec(m.group(2))), '.6f')
+                end = format(float(get_sec(m.group(3))), '.6f')
                 text = m.group(4)
                 print('{}\t{}\t{}:{}'.format(start, end, speaker, text), file=fout)
                 print('{}\t{}\t{}:{}'.format(start, end, speaker, text))

@@ -38,7 +38,7 @@ def do_preprocessing(df, pout=None):
     :param pout: a path to output the resulting data frame to in CSV format
     :return: the resulting data frame with a new column containing the preprocessed text (column name 'TEXT_PP')
     """
-    print('-- Preprocessing corpus...', end='')
+    print('-- preprocessing text corpus...', end='')
     df['TEXT'] = df.TEXT.apply(lambda x: re.sub('\[[^\]]+\]', '', x, flags=re.I))
     df['TEXT'] = df.TEXT.replace('`', '')
     df['TEXT_PP'] = df.TEXT.apply(preprocess_text)

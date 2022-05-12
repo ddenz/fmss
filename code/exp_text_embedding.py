@@ -25,7 +25,7 @@ def prepare_data(transcript_path, unit='token'):
     mean number of sentences per interview (None if token/word is used as a unit)
     """
     print('Preparing data...')
-    dl = DataLoader(transcript_path, None, None, None, load_utterances_with_both_twins=False, load_both_speakers=False, merge_on='speaker')
+    dl = DataLoader(transcript_path, None, None, None, load_utterances_with_both_twins=True, load_both_speakers=False, merge_on='speaker')
     df = dl.load_transcripts()
 
     if unit in ['token', 'word']:

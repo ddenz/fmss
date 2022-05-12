@@ -28,7 +28,7 @@ np.random.seed(SEED)
 
 
 class BasePipeline(object):
-    def __init__(self, data: pd.DataFrame, target_names: list, estimator_name: str, embed_cols:list, acoustic_cols:list, text_cols:list):
+    def __init__(self, data: pd.DataFrame, target_names: list, estimator_name: str, embed_cols:list, acoustic_cols:list, text_cols:list, use_pp_text=False):
         self.data = data
         self.target_names = target_names
         self.estimator_name = estimator_name
@@ -53,7 +53,7 @@ class BasePipeline(object):
         else:
             print('-- using on-the-fly embeddings')
             return ('embedding_features', Pipeline([
-                ('selector', ItemSelector(key='TEXT')),
+                ('selector', ItemSelector(key=self.text_cols[0])),
                 ('embedding_vectorizer', EmbeddingTransformer(embedding_model, aggregation='average'))
             ]))
 
@@ -74,7 +74,7 @@ class BasePipeline(object):
                             ('scaler', StandardScaler())
                         ])),
                         ('tfidf_features', Pipeline([
-                            ('selector', ItemSelector(key='TEXT')),
+                            ('selector', ItemSelector(key=self.text_cols[0])),
                             ('vectorizer', vectorizer)
                         ])),
                         self.select_embedding_feature_source()
@@ -91,7 +91,7 @@ class BasePipeline(object):
                             ('scaler', StandardScaler())
                         ])),
                         ('tfidf_features', Pipeline([
-                            ('selector', ItemSelector(key='TEXT')),
+                            ('selector', ItemSelector(key=self.text_cols[0])),
                             ('vectorizer', vectorizer)
                         ]))
                     ])
@@ -122,7 +122,7 @@ class BasePipeline(object):
                 print('-- using TFIDF and', embedding_model)
                 feature_union = FeatureUnion([
                     ('tfidf_features', Pipeline([
-                        ('selector', ItemSelector(key='TEXT')),
+                        ('selector', ItemSelector(key=self.text_cols[0])),
                         ('vectorizer', vectorizer)
                     ])),
                     self.select_embedding_feature_source()
@@ -135,7 +135,7 @@ class BasePipeline(object):
                     vectorizer = TfidfVectorizer()
                 feature_union = FeatureUnion([
                     ('tfidf_features', Pipeline([
-                        ('selector', ItemSelector(key='TEXT')),
+                        ('selector', ItemSelector(key=self.text_cols[0])),
                         ('vectorizer', vectorizer)
                     ]))
                 ])
@@ -298,6 +298,8 @@ if __name__ == '__main__':
                         help='path to Excel spreadsheet containing ERisk coded data', required=True)
     parser.add_argument('-a', '--acoustic_feature_dir', type=str, nargs=1,
                         help='path to directory containing baseline acoustic features', required=True)
+    parser.add_argument('-p', '--preprocess_text', action='store_true',
+                        help='do text preprocessing (tokenise, remove punctuation and stopwords', required=False)
     parser.add_argument('-w', '--word_embedding_dir', type=str, nargs=1,
                         help='path to directory containing word embedding features', required=False)
     parser.add_argument('-o', '--output_file', type=str, nargs=1,
@@ -340,7 +342,7 @@ if __name__ == '__main__':
         raise ValueError("-- invalid task:" + task + ". Choose 'classification' or 'regression'")
 
     dl = DataLoader(transcript_file, acoustic_features_dir, erisk_codes_file, word_embedding_dir, load_utterances_with_both_twins=True, load_both_speakers=True, merge_on='speaker')
-    df_data = dl.process()
+    df_data = dl.process(preprocess_text=args.preprocess_text)
 
     text_features = []
     acoustic_features = []
@@ -348,8 +350,11 @@ if __name__ == '__main__':
     tfidf = 'tfidf' in args.use_features
     embedding_model = None
 
-    if tfidf or 'glove' in args.use_features or 'word2vec' in args.use_features or 'fasttext' in args.use_features or 'bert' in args.use_features:
-        text_features = ['TEXT']
+    if tfidf or 'glove' in args.use_features or 'word2vec' in args.use_features or 'fasttext' in args.use_features:
+        if args.preprocess_text:
+            text_features = ['TEXT_PP']
+        else:
+            text_features = ['TEXT']
     if 'acoustic' in args.use_features:
         acoustic_features = dl.get_acoustic_feature_names()
     if 'glove' in args.use_features:
@@ -379,6 +384,17 @@ if __name__ == '__main__':
 
     rp.print_target_distribution()
 
-    df_results, preds = rp.process(tfidf=tfidf, embedding_model=embedding_model)
+    d_results, preds = rp.process(tfidf=tfidf, embedding_model=embedding_model)
+    df_results = pd.DataFrame(d_results).T.reset_index()
+    df_results.rename(columns={'index': 'target'}, inplace=True)
+    ac = acoustic_features_dir.split('/')[-1]
+    df_results['acoustic'] = ac
+    uf = '_'.join(args.use_features)
+    df_results['used_features'] = uf
+    df_results['classifier'] = model
+    df_results = df_results[['target', 'acoustic', 'used_features', 'classifier', 'accuracy', 'precision', 'recall', 'f1-score']]
     print(df_results)
+    pout = '../results/exp_indiv_' + ac + '_' + uf + '_' + model + '.csv'
+    df_results.to_csv(pout)
+    print('-- wrote results to file:', pout)
     print(preds, len(preds))
